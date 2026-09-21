@@ -1,0 +1,141 @@
+{
+ "actions": [],
+ "allow_bulk_edit": 1,
+ "allow_rename": 1,
+ "autoname": "SPF-.#####",
+ "creation": "2026-09-21 11:32:12.134151",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "title",
+  "status",
+  "is_active",
+  "last_published_on",
+  "last_published_by",
+  "column_break_evsl",
+  "target_doctype",
+  "print_format",
+  "version",
+  "description",
+  "section_break_vlly",
+  "generated_html",
+  "generated_css",
+  "layout_json"
+ ],
+ "fields": [
+  {
+   "fieldname": "title",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Title",
+   "reqd": 1
+  },
+  {
+   "fieldname": "target_doctype",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Target DocType",
+   "options": "DocType",
+   "reqd": 1
+  },
+  {
+   "fieldname": "print_format",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Print Format",
+   "options": "Print Format",
+   "reqd": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "Draft\nActive\nArchived",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "version",
+   "fieldtype": "Int",
+   "label": "Version",
+   "reqd": 1
+  },
+  {
+   "fieldname": "layout_json",
+   "fieldtype": "JSON",
+   "label": "Layout JSON"
+  },
+  {
+   "fieldname": "generated_html",
+   "fieldtype": "Long Text",
+   "label": "Generated HTML"
+  },
+  {
+   "fieldname": "generated_css",
+   "fieldtype": "Long Text",
+   "label": "Generated CSS"
+  },
+  {
+   "fieldname": "description",
+   "fieldtype": "Small Text",
+   "label": "Description"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_active",
+   "fieldtype": "Check",
+   "label": "Is Active"
+  },
+  {
+   "fieldname": "last_published_on",
+   "fieldtype": "Datetime",
+   "label": "Last Published On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_published_by",
+   "fieldtype": "Link",
+   "label": "Last Published By",
+   "options": "User",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_vlly",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "column_break_evsl",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "grid_page_length": 50,
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-21 12:11:15.455204",
+ "modified_by": "Administrator",
+ "module": "Smart Print Format",
+ "name": "Smart Print Format",
+ "naming_rule": "Expression",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "row_format": "Dynamic",
+ "rows_threshold_for_grid_search": 20,
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}
