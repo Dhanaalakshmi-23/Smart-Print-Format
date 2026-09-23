@@ -10,24 +10,9 @@ import {
   publishSmartPrintFormat,
   saveSmartPrintFormat,
 } from '@/api/smartPrintApi'
+import { findNode } from '@/utils/layout'
 
 const emptyLayout = () => ({ sections: [] })
-
-// Depth-first search for a node with the given id anywhere in the layout
-// (sections, their columns, components, ...). Every node carries an `id`.
-function findNode(node, id) {
-  if (!node || typeof node !== 'object') return null
-  if (node.id === id) return node
-
-  for (const value of Object.values(node)) {
-    if (!Array.isArray(value)) continue
-    for (const child of value) {
-      const found = findNode(child, id)
-      if (found) return found
-    }
-  }
-  return null
-}
 
 // The server doc without layout_json, so the layout only lives in one place.
 function withoutLayout(doc) {
