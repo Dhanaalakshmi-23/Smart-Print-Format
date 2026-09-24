@@ -4,6 +4,7 @@ import HeaderToolbar from '@/components/HeaderToolbar.vue'
 import FieldPalette from '@/components/FieldPalette.vue'
 import ComponentPalette from '@/components/ComponentPalette.vue'
 import DesignerCanvas from '@/components/DesignerCanvas.vue'
+import PropertiesPanel from '@/components/PropertiesPanel.vue'
 
 const showPreview = ref(false)
 </script>
@@ -21,6 +22,10 @@ const showPreview = ref(false)
       <main class="builder__main">
         <DesignerCanvas :preview="showPreview" />
       </main>
+
+      <div v-if="!showPreview" class="builder__sidebar builder__sidebar--end">
+        <PropertiesPanel />
+      </div>
     </div>
   </div>
 </template>
@@ -43,6 +48,12 @@ const showPreview = ref(false)
   flex-shrink: 0;
   overflow-y: auto;
   border-right: 1px solid var(--border);
+}
+
+.builder__sidebar--end {
+  width: 260px;
+  border-right: none;
+  border-left: 1px solid var(--border);
 }
 
 .builder__main {

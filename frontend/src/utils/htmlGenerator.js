@@ -8,7 +8,8 @@
 //
 // Supported node props (all optional):
 //   hidden, hideLabel, label (fields and sections), bold, align ('left'|'center'|'right'),
-//   fontSize (px number), color (hex or CSS color name)
+//   fontSize (px number), color (hex or CSS color name),
+//   width (% of the parent; for columns, % of the section row)
 
 import { getTableColumns, isTableField, resolveField, resolveLabel } from './fieldResolver'
 
@@ -29,7 +30,22 @@ export function propsToStyle(props = {}) {
   const size = Number(props.fontSize)
   if (size > 0 && size <= 72) rules.push(`font-size: ${size}px`)
   if (/^(#[0-9a-f]{3,8}|[a-z]+)$/i.test(props.color || '')) rules.push(`color: ${props.color}`)
+  const width = validWidth(props.width)
+  if (width) rules.push(`width: ${width}%`, 'box-sizing: border-box')
   return rules.join('; ')
+}
+
+const validWidth = (value) => {
+  const width = Number(value)
+  return width > 0 && width <= 100 ? width : null
+}
+
+// Columns sit in a flex row, where `width` is ignored: their width is set as
+// a flex basis on the column's wrapper instead. Use with propsToStyle on the
+// column's own props minus `width`.
+export function columnFlexStyle(props = {}) {
+  const width = validWidth(props.width)
+  return width ? `flex: 0 1 ${width}%` : ''
 }
 
 function styleFromProps(props = {}) {
@@ -98,10 +114,14 @@ function renderComponent(node) {
 }
 
 function renderColumn(column, ctx) {
+  if (column.props?.hidden) return ''
+  const { width, ...props } = column.props || {}
+  const style = [columnFlexStyle(column.props), propsToStyle(props)].filter(Boolean).join('; ')
   const fields = (column.fields || [])
     .map((item) => (item.type === 'component' ? renderComponent(item) : renderField(item, ctx)))
     .join('')
-  return `<div class="spf-column" data-node-id="${escapeHtml(column.id)}"${styleFromProps(column.props)}>${fields}</div>`
+  const styleAttr = style ? ` style="${escapeHtml(style)}"` : ''
+  return `<div class="spf-column" data-node-id="${escapeHtml(column.id)}"${styleAttr}>${fields}</div>`
 }
 
 function renderSection(section, ctx) {

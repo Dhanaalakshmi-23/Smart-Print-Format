@@ -2,7 +2,7 @@
 // A column inside a section: a vertical list of fields, tables and components
 // that accepts drops from the palettes and from other columns.
 
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useCanvasNode } from '@/composables/useCanvasNode'
 import { useDropList } from '@/composables/useDropList'
 import { isTableField } from '@/utils/fieldResolver'
@@ -20,6 +20,12 @@ const props = defineProps({
 
 const { isSelected, select, onDragStart, moveBy, remove } = useCanvasNode(() => props.node)
 
+// Width is applied by SectionBlock on the column's flex wrapper, not here.
+const style = computed(() => {
+  const { width, ...rest } = props.node.props || {}
+  return propsToStyle(rest)
+})
+
 const listEl = ref(null)
 const { dropIndex, onDragover, onDragleave, onDrop } = useDropList(listEl, {
   parentType: 'column',
@@ -31,7 +37,7 @@ const { dropIndex, onDragover, onDragleave, onDrop } = useDropList(listEl, {
   <div
     class="column"
     :class="{ 'is-selected': isSelected }"
-    :style="propsToStyle(node.props)"
+    :style="style"
     draggable="true"
     tabindex="0"
     @dragstart="onDragStart"

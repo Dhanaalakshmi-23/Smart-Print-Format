@@ -6,7 +6,7 @@ import { computed, ref } from 'vue'
 import { useCanvasNode } from '@/composables/useCanvasNode'
 import { useDropList } from '@/composables/useDropList'
 import { useDesigner } from '@/composables/useDesigner'
-import { propsToStyle } from '@/utils/htmlGenerator'
+import { columnFlexStyle, propsToStyle } from '@/utils/htmlGenerator'
 import ConditionalBlock from './ConditionalBlock.vue'
 import ColumnBlock from './ColumnBlock.vue'
 import NodeActions from './NodeActions.vue'
@@ -78,6 +78,7 @@ const { dropIndex, onDragover, onDragleave, onDrop } = useDropList(listEl, {
         :node="column"
         class="section__column"
         :class="{ 'drop-before-x': dropIndex === i }"
+        :style="columnFlexStyle(column.props)"
       >
         <ColumnBlock :node="column" :index="i" :count="node.columns.length" />
       </ConditionalBlock>
