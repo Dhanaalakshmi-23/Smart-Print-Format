@@ -1,4 +1,4 @@
-// Smart Print Format documents and their versions.
+// Smart Print Format documents, their versions, and reusable components.
 //
 // The UI works with `layout_json` as a plain object; this module converts it
 // to/from the JSON string stored in the database.
@@ -7,6 +7,7 @@ import { deleteDoc, getDoc, getList, insertDoc, updateDoc } from './frappeApi'
 
 const DOCTYPE = 'Smart Print Format'
 const VERSION_DOCTYPE = 'Smart Print Format Version'
+const COMPONENT_DOCTYPE = 'Smart Print Format Component'
 
 const LIST_FIELDS = [
   'name',
@@ -170,4 +171,38 @@ export async function publishSmartPrintFormat(name, { changeSummary = '' } = {})
     last_published_on: version.created_on,
     last_published_by: version.created_by,
   })
+}
+
+// ---- Reusable components ----
+
+const COMPONENT_LIST_FIELDS = [
+  'name',
+  'component_name',
+  'component_type',
+  'description',
+  'configuration_json',
+  'thumbnail_svg',
+]
+
+function parseConfiguration(value) {
+  if (!value || typeof value !== 'string') return value || {}
+  try {
+    return JSON.parse(value)
+  } catch {
+    return {}
+  }
+}
+
+// Active Smart Print Format Components, with configuration_json parsed.
+export async function getActiveComponents() {
+  const components = await getList(COMPONENT_DOCTYPE, {
+    fields: COMPONENT_LIST_FIELDS,
+    filters: [['is_active', '=', 1]],
+    orderBy: 'component_name asc',
+    limit: 0,
+  })
+  return components.map((component) => ({
+    ...component,
+    configuration_json: parseConfiguration(component.configuration_json),
+  }))
 }

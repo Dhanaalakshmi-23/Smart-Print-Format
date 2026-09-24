@@ -63,8 +63,16 @@ async function parseBody(response) {
   }
 }
 
+// Frappe messages often contain markup like "<strong>Guest</strong>";
+// the UI shows errors as plain text, so keep only the text.
+function stripHtml(value) {
+  const html = String(value ?? '')
+  if (typeof DOMParser === 'undefined') return html.replace(/<[^>]*>/g, '')
+  return new DOMParser().parseFromString(html, 'text/html').body.textContent || ''
+}
+
 function toApiError(response, body) {
-  const serverMessages = parseServerMessages(body._server_messages)
+  const serverMessages = parseServerMessages(body._server_messages).map(stripHtml)
   const exceptionLine = typeof body.exception === 'string' ? body.exception.split('\n')[0] : ''
   const message =
     serverMessages[0] ||
