@@ -6,8 +6,10 @@ import ComponentPalette from '@/components/ComponentPalette.vue'
 import DesignerCanvas from '@/components/DesignerCanvas.vue'
 import PropertiesPanel from '@/components/PropertiesPanel.vue'
 import PreviewPanel from '@/components/PreviewPanel.vue'
+import VersionPanel from '@/components/VersionPanel.vue'
 
 const showPreview = ref(false)
+const sidePanel = ref('properties') // 'properties' | 'versions'
 </script>
 
 <template>
@@ -26,8 +28,29 @@ const showPreview = ref(false)
         <PreviewPanel v-if="showPreview" />
       </main>
 
-      <div v-if="!showPreview" class="builder__sidebar builder__sidebar--end">
-        <PropertiesPanel />
+      <div class="builder__sidebar builder__sidebar--end">
+        <div class="builder__tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="sidePanel === 'properties'"
+            :disabled="showPreview"
+            @click="sidePanel = 'properties'"
+          >
+            Properties
+          </button>
+          <button
+            type="button"
+            role="tab"
+            :aria-selected="sidePanel === 'versions' || showPreview"
+            @click="sidePanel = 'versions'"
+          >
+            History
+          </button>
+        </div>
+        <!-- Nothing can be selected while previewing, so show history then. -->
+        <VersionPanel v-if="sidePanel === 'versions' || showPreview" />
+        <PropertiesPanel v-else />
       </div>
     </div>
   </div>
@@ -57,6 +80,32 @@ const showPreview = ref(false)
   width: 260px;
   border-right: none;
   border-left: 1px solid var(--border);
+}
+
+.builder__tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border);
+}
+
+.builder__tabs button {
+  flex: 1;
+  padding: 8px;
+  font: 13px var(--sans);
+  color: var(--text);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+}
+
+.builder__tabs button[aria-selected='true'] {
+  color: var(--text-h);
+  border-bottom-color: var(--accent);
+}
+
+.builder__tabs button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .builder__main {

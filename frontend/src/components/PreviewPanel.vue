@@ -10,7 +10,8 @@
 // "Refresh" is clicked if auto-update is turned off.
 //
 // Usage:
-//   <PreviewPanel />
+//   <PreviewPanel />                         the layout being edited
+//   <PreviewPanel :layout="version.layout" /> any other layout, e.g. a saved version
 
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useSmartPrintStore } from '@/stores/smartPrintStore'
@@ -19,7 +20,12 @@ import { generatePreview } from '@/utils/htmlGenerator'
 
 const AUTO_UPDATE_DELAY = 300 // ms after the last change
 
+const props = defineProps({
+  layout: { type: Object, default: null },
+})
+
 const store = useSmartPrintStore()
+const layout = computed(() => props.layout || store.layoutJson)
 const { meta, getChildMeta, loading: metaLoading } = useDoctypeMeta(() => store.targetDoctype)
 
 const placeholders = ref('jinja') // 'jinja' | 'fieldname'
@@ -38,12 +44,12 @@ body { margin: 0; padding: 15mm; box-sizing: border-box; min-height: 297mm; }
 `
 
 function render() {
-  const { html: body, css } = generatePreview(store.layoutJson, {
+  const { html: body, css } = generatePreview(layout.value, {
     meta: meta.value,
     getChildMeta,
     placeholders: placeholders.value,
   })
-  const content = store.layoutJson.sections.length
+  const content = layout.value.sections?.length
     ? body
     : '<p class="spf-empty">The layout is empty. Add sections on the canvas to preview them.</p>'
   // generatePreview escapes every value from the layout, so this is safe.
@@ -70,7 +76,7 @@ function refresh() {
 
 // Every designer change replaces layoutJson with a new object (see
 // useDesigner's commit), so a shallow watch sees each edit and undo.
-watch([() => store.layoutJson, meta], scheduleRender)
+watch([layout, meta], scheduleRender)
 // Settings apply at once; turning auto-update back on catches up.
 watch(placeholders, refresh)
 watch(autoUpdate, (on) => on && isStale.value && refresh())
