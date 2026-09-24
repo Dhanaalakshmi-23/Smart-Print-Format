@@ -1,10 +1,14 @@
-// Client-side PREVIEW of a layout, for the designer canvas only.
+// Client-side PREVIEW of a layout, for the designer only.
 //
 // This is not the real print output: the printed document is still rendered
 // by Frappe's Print Format / Jinja on the server. The preview just shows the
 // structure, using sample values from `doc` when given, or placeholders.
 //
-//   const { html, css } = generatePreview(layout, { meta, getChildMeta, doc })
+//   const { html, css } = generatePreview(layout, { meta, getChildMeta, doc, placeholders })
+//
+// `placeholders` (used when there is no `doc`):
+//   'fieldname'  customer_name
+//   'jinja'      {{ doc.customer_name }}, and {% for row in doc.items %} for tables
 //
 // Supported node props (all optional):
 //   hidden, hideLabel, label (fields and sections), bold, align ('left'|'center'|'right'),
@@ -60,6 +64,18 @@ function formatValue(value, fieldtype) {
 }
 
 const placeholder = (text) => `<span class="spf-placeholder">${escapeHtml(text)}</span>`
+const jinja = (code) => `<code class="spf-jinja">${escapeHtml(code)}</code>`
+
+// Jinja expression for a field path. A child-table path used outside its
+// table ("items.item_code") refers to the first row.
+function jinjaExpression(path) {
+  const [table, ...rest] = path.split('.')
+  return rest.length ? `doc.${table}[0].${rest.join('.')}` : `doc.${path}`
+}
+
+function valuePlaceholder(path, ctx) {
+  return ctx.placeholders === 'jinja' ? jinja(`{{ ${jinjaExpression(path)} }}`) : placeholder(path)
+}
 
 // ---- Renderers ----
 
@@ -68,16 +84,23 @@ function renderTable(field, info, ctx) {
   const columns = getTableColumns(childMeta)
   const rows = Array.isArray(ctx.doc?.[field.fieldname]) ? ctx.doc[field.fieldname] : null
 
+  const useJinja = !rows && ctx.placeholders === 'jinja'
+  const cellPlaceholder = (df) => (useJinja ? jinja(`{{ row.${df.fieldname} }}`) : placeholder(df.fieldname))
+
   const head = columns.map((df) => `<th>${escapeHtml(df.label || df.fieldname)}</th>`).join('')
   const body = rows
     ? rows
         .map((row) => `<tr>${columns.map((df) => `<td>${formatValue(row[df.fieldname], df.fieldtype)}</td>`).join('')}</tr>`)
         .join('')
-    : `<tr>${columns.map((df) => `<td>${placeholder(df.fieldname)}</td>`).join('')}</tr>`
+    : `<tr>${columns.map((df) => `<td>${cellPlaceholder(df)}</td>`).join('')}</tr>`
+  // One placeholder row stands for every row of the loop.
+  const loop = useJinja
+    ? `<caption class="spf-loop">${jinja(`{% for row in doc.${field.fieldname} %}`)}</caption>`
+    : ''
 
   return columns.length
-    ? `<table class="spf-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
-    : placeholder(`${field.fieldname} (table)`)
+    ? `<table class="spf-table">${loop}<thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`
+    : valuePlaceholder(field.fieldname, ctx)
 }
 
 function renderField(field, ctx) {
@@ -95,7 +118,7 @@ function renderField(field, ctx) {
   } else if (ctx.doc) {
     valueHtml = formatValue(ctx.doc[field.fieldname], info?.fieldtype || field.fieldtype)
   } else {
-    valueHtml = placeholder(field.fieldname)
+    valueHtml = valuePlaceholder(field.fieldname, ctx)
   }
 
   return (
@@ -146,13 +169,18 @@ export const PREVIEW_CSS = `
 .spf-field { margin-bottom: 8px; }
 .spf-label { color: #6c7680; font-size: 11px; }
 .spf-placeholder { color: #8d99a6; font-style: italic; }
+.spf-jinja { font: 11px ui-monospace, Consolas, monospace; color: #6d28d9; background: #f5f3ff; border-radius: 3px; padding: 0 3px; }
+.spf-loop { caption-side: top; text-align: left; padding-bottom: 2px; }
 .spf-component { margin-bottom: 8px; padding: 8px; border: 1px dashed #d1d8dd; }
 .spf-table { width: 100%; border-collapse: collapse; }
 .spf-table th, .spf-table td { border: 1px solid #d1d8dd; padding: 4px 6px; text-align: left; }
 `.trim()
 
-export function generatePreview(layout, { meta = null, getChildMeta = null, doc = null } = {}) {
-  const ctx = { meta, getChildMeta, doc }
+export function generatePreview(
+  layout,
+  { meta = null, getChildMeta = null, doc = null, placeholders = 'fieldname' } = {},
+) {
+  const ctx = { meta, getChildMeta, doc, placeholders }
   const sections = (layout?.sections || []).map((section) => renderSection(section, ctx)).join('')
   return {
     html: `<div class="spf-preview">${sections}</div>`,

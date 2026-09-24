@@ -2,9 +2,10 @@
 // The A4 page the layout is designed on. Renders store.layoutJson (through
 // useDesigner) as sections → columns → fields, and handles page-level
 // drops, selection clearing and keyboard shortcuts.
+// The read-only preview lives in PreviewPanel.
 //
 // Usage:
-//   <DesignerCanvas :preview="showPreview" />
+//   <DesignerCanvas />
 
 import { computed, provide, ref } from 'vue'
 import { useSmartPrintStore } from '@/stores/smartPrintStore'
@@ -12,14 +13,8 @@ import { useDesigner } from '@/composables/useDesigner'
 import { useDoctypeMeta } from '@/composables/useDoctypeMeta'
 import { useDropList } from '@/composables/useDropList'
 import { acceptsDrop, getDragData } from '@/utils/dragData'
-import { generatePreview } from '@/utils/htmlGenerator'
 import ConditionalBlock from './ConditionalBlock.vue'
 import SectionBlock from './SectionBlock.vue'
-
-const props = defineProps({
-  // Show the generated preview HTML instead of the editable blocks.
-  preview: { type: Boolean, default: false },
-})
 
 const store = useSmartPrintStore()
 const designer = useDesigner()
@@ -75,27 +70,11 @@ function onKeydown(event) {
     clearSelection()
   }
 }
-
-// ---- Preview ----
-
-const previewHtml = computed(() => {
-  if (!props.preview) return ''
-  const { html, css } = generatePreview(store.layoutJson, {
-    meta: doctypeMeta.meta.value,
-    getChildMeta: doctypeMeta.getChildMeta,
-  })
-  // generatePreview escapes every value, so this is safe for v-html.
-  return `<style>${css}</style>${html}`
-})
 </script>
 
 <template>
   <div class="canvas" @keydown="onKeydown">
-    <!-- Preview: read-only generated HTML -->
-    <div v-if="preview" class="page" v-html="previewHtml" />
-
-    <!-- Designer -->
-    <div v-else class="page" @click="clearSelection">
+    <div class="page" @click="clearSelection">
       <div
         v-if="!sections.length"
         class="page__empty"

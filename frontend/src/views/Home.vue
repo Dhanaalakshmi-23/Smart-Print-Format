@@ -5,6 +5,7 @@ import FieldPalette from '@/components/FieldPalette.vue'
 import ComponentPalette from '@/components/ComponentPalette.vue'
 import DesignerCanvas from '@/components/DesignerCanvas.vue'
 import PropertiesPanel from '@/components/PropertiesPanel.vue'
+import PreviewPanel from '@/components/PreviewPanel.vue'
 
 const showPreview = ref(false)
 </script>
@@ -20,7 +21,9 @@ const showPreview = ref(false)
       </div>
 
       <main class="builder__main">
-        <DesignerCanvas :preview="showPreview" />
+        <!-- v-show keeps the canvas (and its scroll position) while previewing. -->
+        <DesignerCanvas v-show="!showPreview" />
+        <PreviewPanel v-if="showPreview" />
       </main>
 
       <div v-if="!showPreview" class="builder__sidebar builder__sidebar--end">
