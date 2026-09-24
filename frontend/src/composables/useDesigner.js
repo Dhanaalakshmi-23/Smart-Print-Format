@@ -7,6 +7,7 @@ import { useHistory } from '@/composables/useHistory'
 import {
   cloneLayout,
   createColumn,
+  createComponentNode,
   createField,
   createSection,
   findNode,
@@ -61,10 +62,20 @@ function createDesigner() {
   // the selected field, or the last column, creating a section if needed.
   // Returns the new field's id.
   function addField(node, { columnId, index } = {}) {
+    return addToColumn(createField(node), { columnId, index })
+  }
+
+  // `component` is a Smart Print Format Component (from ComponentPalette).
+  // Placement works like addField. Returns the new node's id.
+  function addComponent(component, { columnId, index } = {}) {
+    return addToColumn(createComponentNode(component), { columnId, index })
+  }
+
+  function addToColumn(newNode, { columnId, index }) {
     return commit((layout) => {
       const column = columnId ? findNode(layout, columnId) : defaultColumn(layout)
       if (!column) throw new Error(`Column '${columnId}' not found.`)
-      return insertNode(column, createField(node), index).id
+      return insertNode(column, newNode, index).id
     })
   }
 
@@ -82,6 +93,15 @@ function createDesigner() {
       if (!node) throw new Error(`Node '${id}' not found.`)
       insertNode(target, node, index)
     })
+  }
+
+  // Move a node one position up/left (-1) or down/right (+1) among its siblings.
+  function moveNodeBy(id, delta) {
+    const location = findParent(store.layoutJson, id)
+    if (!location) return
+    const index = location.index + delta
+    if (index < 0 || index >= location.list.length) return
+    moveNode(id, location.parent.id ?? null, index)
   }
 
   function deleteNode(id) {
@@ -111,7 +131,7 @@ function createDesigner() {
     const selectedId = store.selectedNode
     const selected = findNode(layout, selectedId)
     if (selected?.type === 'column') return selected
-    if (selected?.type === 'field') return findParent(layout, selectedId).parent
+    if (selected?.type === 'field' || selected?.type === 'component') return findParent(layout, selectedId).parent
 
     let section = layout.sections.at(-1)
     if (!section) section = insertNode(layout, createSection())
@@ -137,7 +157,9 @@ function createDesigner() {
     addSection,
     addColumn,
     addField,
+    addComponent,
     moveNode,
+    moveNodeBy,
     deleteNode,
     updateProps,
     undo,

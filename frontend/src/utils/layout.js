@@ -10,6 +10,7 @@ export const PARENT_TYPE = {
   section: 'layout',
   column: 'section',
   field: 'column',
+  component: 'column', // reusable component, placed alongside fields
 }
 
 const typeOf = (node) => node.type || 'layout'
@@ -40,6 +41,19 @@ export function createField(docfield = {}) {
     label: docfield.label || '',
     fieldtype: docfield.fieldtype || '',
     options: docfield.options || '',
+    props: {},
+  }
+}
+
+// `component` is a Smart Print Format Component (from ComponentPalette).
+export function createComponentNode(component = {}) {
+  return {
+    id: generateId('component'),
+    type: 'component',
+    component: component.name || '',
+    component_name: component.component_name || component.name || '',
+    component_type: component.component_type || '',
+    configuration: component.configuration_json || {},
     props: {},
   }
 }
