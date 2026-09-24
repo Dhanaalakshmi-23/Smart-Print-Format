@@ -3,9 +3,10 @@
 // and the main actions (undo/redo, validate, preview, save, publish).
 //
 // Usage:
-//   <HeaderToolbar v-model:preview="showPreview" @validate="onValidate" />
+//   <HeaderToolbar v-model:preview="showPreview" v-model:history="showHistory" @validate="onValidate" />
 //
 // - v-model:preview   the parent decides what "preview mode" shows
+// - v-model:history   the parent decides where the version history opens
 // - @validate(result) result of validateLayout(), for showing the error list
 
 import { computed, onMounted, ref, watch } from 'vue'
@@ -17,6 +18,7 @@ import { getPrintFormats } from '@/api/printFormatApi'
 import { validateLayout } from '@/utils/validation'
 
 const preview = defineModel('preview', { type: Boolean, default: false })
+const history = defineModel('history', { type: Boolean, default: false })
 const emit = defineEmits(['validate'])
 
 const store = useSmartPrintStore()
@@ -194,6 +196,14 @@ const statusText = computed(() => {
           @click="preview = !preview"
         >
           Preview
+        </button>
+        <button
+          type="button"
+          :class="{ 'is-active': history }"
+          :aria-pressed="history"
+          @click="history = !history"
+        >
+          History
         </button>
       </div>
 
