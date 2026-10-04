@@ -1,14 +1,6 @@
 <script setup>
-// Wraps every node on the canvas and shows its visibility rules:
-// - props.condition: printed only when the condition is true
-//   (e.g. "doc.status == 'Paid'"), evaluated at print time, not here
-// - props.hidden:    never printed
-//
-// The canvas always shows the node so it can still be edited; the badge and
-// dashed outline tell the user it may not appear on paper.
-// Also marks the node's position for drop-index calculation (data-node-id).
-
 import { computed } from 'vue'
+import { useDesigner } from '@/composables/useDesigner'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -16,12 +8,15 @@ const props = defineProps({
 
 const condition = computed(() => props.node.props?.condition?.trim() || '')
 const hidden = computed(() => Boolean(props.node.props?.hidden))
+
+const { invalidIds } = useDesigner()
+const invalid = computed(() => invalidIds.value.has(props.node.id))
 </script>
 
 <template>
   <div
     class="conditional"
-    :class="{ 'is-conditional': condition, 'is-hidden': hidden }"
+    :class="{ 'is-conditional': condition, 'is-hidden': hidden, 'is-invalid': invalid }"
     :data-node-id="node.id"
   >
     <div v-if="hidden || condition" class="conditional__badges">
@@ -41,7 +36,7 @@ const hidden = computed(() => Boolean(props.node.props?.hidden))
 
 .conditional.is-conditional,
 .conditional.is-hidden {
-  outline: 1px dashed #c77c00;
+  outline: 1px dashed var(--orange);
   outline-offset: 2px;
 }
 
@@ -62,17 +57,22 @@ const hidden = computed(() => Boolean(props.node.props?.hidden))
   white-space: nowrap;
   padding: 0 6px;
   border-radius: 3px;
-  background: #fff4e0;
-  color: #8a5500;
+  background: var(--orange-bg);
+  color: var(--orange);
   font: 10px/1.6 var(--sans);
 }
 
-/* Drop indicators, set by the parent list (see useDropList). */
+.conditional.is-invalid {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
+  border-radius: 4px;
+}
+
 .conditional.drop-before {
-  box-shadow: 0 -3px 0 #7c3aed;
+  box-shadow: 0 -3px 0 var(--blue);
 }
 
 .conditional.drop-before-x {
-  box-shadow: -3px 0 0 #7c3aed;
+  box-shadow: -3px 0 0 var(--blue);
 }
 </style>

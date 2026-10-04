@@ -1,9 +1,3 @@
-// State of the Smart Print Format currently open in the designer.
-//
-// `layoutJson` is the frontend source of truth for the layout: the designer
-// reads and edits it here, and it is only sent to the server on save/publish.
-// All server calls go through src/api/smartPrintApi.js.
-
 import { defineStore } from 'pinia'
 import {
   getSmartPrintFormat,
@@ -11,10 +5,8 @@ import {
   saveSmartPrintFormat,
 } from '@/api/smartPrintApi'
 import { findNode } from '@/utils/layout'
+import { createEmptyLayout as emptyLayout } from '@/utils/layoutSerializer'
 
-const emptyLayout = () => ({ sections: [] })
-
-// The server doc without layout_json, so the layout only lives in one place.
 function withoutLayout(doc) {
   const { layout_json, ...rest } = doc
   return rest
@@ -22,12 +14,12 @@ function withoutLayout(doc) {
 
 export const useSmartPrintStore = defineStore('smartPrint', {
   state: () => ({
-    currentSPF: null, // server fields of the open doc (name, title, print_format, ...)
+    currentSPF: null,
     targetDoctype: null,
     layoutJson: emptyLayout(),
-    selectedNode: null, // id of the selected layout node
+    selectedNode: null,
     isDirty: false,
-    status: 'idle', // 'idle' | 'loading' | 'saving' | 'publishing' | 'error'
+    status: 'idle',
     error: null,
   }),
 
@@ -40,12 +32,10 @@ export const useSmartPrintStore = defineStore('smartPrint', {
   },
 
   actions: {
-    // ---- Local state updates ----
-
-    newSPF(values = {}) {
+    newSPF(values = {}, layout = null) {
       this.currentSPF = { ...values }
       this.targetDoctype = values.target_doctype || null
-      this.layoutJson = emptyLayout()
+      this.layoutJson = layout || emptyLayout()
       this.selectedNode = null
       this.isDirty = false
       this.status = 'idle'
@@ -58,7 +48,6 @@ export const useSmartPrintStore = defineStore('smartPrint', {
       this.isDirty = true
     },
 
-    // Other fields of the doc (title, print_format, description, ...).
     setFields(values) {
       this.currentSPF = { ...this.currentSPF, ...values }
       this.isDirty = true
@@ -72,13 +61,6 @@ export const useSmartPrintStore = defineStore('smartPrint', {
       this.isDirty = true
     },
 
-    updateNode(id, changes) {
-      const node = findNode(this.layoutJson, id)
-      if (!node) return
-      Object.assign(node, changes)
-      this.isDirty = true
-    },
-
     selectNode(id) {
       this.selectedNode = id
     },
@@ -86,8 +68,6 @@ export const useSmartPrintStore = defineStore('smartPrint', {
     clearSelection() {
       this.selectedNode = null
     },
-
-    // ---- Server sync (API calls live in src/api/) ----
 
     async load(name) {
       this.status = 'loading'
@@ -105,18 +85,18 @@ export const useSmartPrintStore = defineStore('smartPrint', {
       }
     },
 
-    async save() {
+    async save({ changeSummary } = {}) {
       this.status = 'saving'
       this.error = null
-      // Cleared before the request: edits made while saving set it back to true.
+      // Cleared before the request, so edits made while saving mark it dirty again.
       this.isDirty = false
       try {
         const doc = await saveSmartPrintFormat({
           ...this.currentSPF,
           target_doctype: this.targetDoctype,
           layout_json: this.layoutJson,
+          change_summary: changeSummary,
         })
-        // Keep the local layout: it may have changed while the request ran.
         this.currentSPF = withoutLayout(doc)
         this.status = 'idle'
         return doc
@@ -128,7 +108,7 @@ export const useSmartPrintStore = defineStore('smartPrint', {
 
     async publish({ changeSummary = '' } = {}) {
       if (this.isNew || this.isDirty) {
-        await this.save()
+        await this.save({ changeSummary })
         if (this.status === 'error') return
       }
 

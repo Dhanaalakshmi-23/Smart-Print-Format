@@ -1,0 +1,44 @@
+[
+ {
+  "description": "Shows an image such as the company logo.",
+  "doctype": "Smart Print Format Component Type",
+  "is_active": 1,
+  "name": "Image",
+  "type_name": "Image"
+ },
+ {
+  "description": "A horizontal rule between blocks.",
+  "doctype": "Smart Print Format Component Type",
+  "is_active": 1,
+  "name": "Divider",
+  "type_name": "Divider"
+ },
+ {
+  "description": "Custom HTML, sanitized before printing.",
+  "doctype": "Smart Print Format Component Type",
+  "is_active": 1,
+  "name": "HTML",
+  "type_name": "HTML"
+ },
+ {
+  "description": "Current page and page count (PDF only).",
+  "doctype": "Smart Print Format Component Type",
+  "is_active": 1,
+  "name": "Page Number",
+  "type_name": "Page Number"
+ },
+ {
+  "description": "Static text.",
+  "doctype": "Smart Print Format Component Type",
+  "is_active": 1,
+  "name": "Text",
+  "type_name": "Text"
+ },
+ {
+  "description": "A signature line with a caption.",
+  "doctype": "Smart Print Format Component Type",
+  "is_active": 1,
+  "name": "Signature",
+  "type_name": "Signature"
+ }
+]

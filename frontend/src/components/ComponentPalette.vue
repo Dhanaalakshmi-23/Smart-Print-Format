@@ -1,15 +1,15 @@
 <script setup>
-// Lists the active reusable Smart Print Format Components, grouped by type,
-// so they can be dragged onto the canvas.
-
-import { computed, onMounted, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { getActiveComponents } from '@/api/smartPrintApi'
+import { useDesigner } from '@/composables/useDesigner'
 import { setDragData } from '@/utils/dragData'
+import { componentIcon } from '@/utils/icons'
+
+const { addComponent } = useDesigner()
 
 const components = ref([])
 const loading = ref(false)
 const error = ref(null)
-const search = ref('')
 
 async function load() {
   loading.value = true
@@ -25,134 +25,88 @@ async function load() {
 
 onMounted(load)
 
-// { 'Header': [...], 'Footer': [...] }, filtered by the search box.
-const groups = computed(() => {
-  const query = search.value.trim().toLowerCase()
-  const byType = {}
-  for (const component of components.value) {
-    const text = `${component.component_name} ${component.description || ''}`.toLowerCase()
-    if (query && !text.includes(query)) continue
-    ;(byType[component.component_type] ||= []).push(component)
-  }
-  return Object.entries(byType)
+const toPayload = (component) => ({
+  name: component.name,
+  component_name: component.component_name,
+  component_type: component.component_type,
+  configuration_json: component.configuration_json,
 })
 
-// Shown through <img>, never v-html: an <img> can't run scripts or event
-// handlers embedded in the SVG.
-const thumbnailSrc = (svg) => (svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : null)
-
 function onDragStart(event, component) {
-  setDragData(event, {
-    kind: 'component',
-    component: {
-      name: component.name,
-      component_name: component.component_name,
-      component_type: component.component_type,
-      configuration_json: component.configuration_json,
-    },
-  })
+  setDragData(event, { kind: 'component', component: toPayload(component) })
+}
+
+function onAdd(component) {
+  addComponent(toPayload(component))
 }
 </script>
 
 <template>
   <aside class="palette" aria-label="Components">
-    <h2 class="palette__title">Components</h2>
+    <h3 class="palette__divider">—— Components ——</h3>
 
     <p v-if="loading" class="palette__message">Loading components…</p>
     <div v-else-if="error" class="palette__message is-error">
       <p>{{ error }}</p>
-      <button type="button" @click="load">Retry</button>
+      <button type="button" class="palette__retry" @click="load">Retry</button>
     </div>
-    <p v-else-if="!components.length" class="palette__message">No active components yet.</p>
+    <p v-else-if="!components.length" class="palette__message">
+      No active Smart Print Format Components yet.
+    </p>
 
-    <template v-else>
-      <input
-        v-model="search"
-        class="palette__search"
-        type="search"
-        placeholder="Search components"
-        aria-label="Search components"
-      />
-
-      <p v-if="!groups.length" class="palette__message">No components match “{{ search }}”.</p>
-
-      <details v-for="[type, items] in groups" :key="type" class="palette__group" open>
-        <summary>
-          {{ type }} <span class="palette__count">{{ items.length }}</span>
-        </summary>
-        <ul>
-          <li
-            v-for="component in items"
-            :key="component.name"
-            class="palette__card"
-            draggable="true"
-            :title="`${component.component_name} — drag onto the canvas`"
-            @dragstart="onDragStart($event, component)"
-          >
-            <img
-              v-if="component.thumbnail_svg"
-              class="palette__thumb"
-              :src="thumbnailSrc(component.thumbnail_svg)"
-              alt=""
-            />
-            <div class="palette__text">
-              <span class="palette__label">{{ component.component_name }}</span>
-              <span v-if="component.description" class="palette__description">
-                {{ component.description }}
-              </span>
-            </div>
-          </li>
-        </ul>
-      </details>
-    </template>
+    <ul v-else>
+      <li v-for="component in components" :key="component.name">
+        <button
+          type="button"
+          class="palette__item"
+          draggable="true"
+          :title="`${component.component_type}: ${component.description || component.component_name} — drag onto the canvas or click to add`"
+          @dragstart="onDragStart($event, component)"
+          @click="onAdd(component)"
+        >
+          <span class="palette__icon" aria-hidden="true">{{ componentIcon(component) }}</span>
+          <span class="palette__label">{{ component.component_name }}</span>
+        </button>
+      </li>
+    </ul>
   </aside>
 </template>
 
 <style scoped>
 .palette {
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 12px;
-  font-size: 13px;
-  overflow-y: auto;
-}
-
-.palette__title {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
+  gap: 4px;
+  padding: 2px 8px 12px;
 }
 
 .palette__message {
-  margin: 0;
-  color: var(--text);
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .palette__message.is-error {
-  color: #d9383a;
+  color: var(--red);
 }
 
-.palette__search,
-button {
+.palette__retry {
+  margin-top: 6px;
+  padding: 3px 10px;
   font: inherit;
-  color: var(--text-h);
-  background: var(--bg);
+  color: var(--text);
+  background: var(--card);
   border: 1px solid var(--border);
   border-radius: 6px;
-  padding: 4px 8px;
-}
-
-.palette__group summary {
   cursor: pointer;
-  font-weight: 600;
-  color: var(--text-h);
-  padding: 4px 0;
 }
 
-.palette__count {
-  font-weight: normal;
-  color: var(--text);
+.palette__divider {
+  margin: 2px 0 0;
+  font-size: 11px;
+  font-weight: 400;
+  text-align: center;
+  color: var(--muted);
 }
 
 ul {
@@ -161,54 +115,39 @@ ul {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
 }
 
-.palette__card {
+.palette__item {
+  width: 100%;
   display: flex;
-  gap: 8px;
   align-items: center;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
+  gap: 6px;
+  padding: 3px 10px;
+  min-height: 24px;
+  font: 12px var(--sans);
+  color: var(--orange);
+  text-align: left;
+  background: var(--orange-bg);
+  border: 1px solid var(--orange);
+  border-radius: var(--radius-card);
   cursor: grab;
 }
 
-.palette__card:hover {
-  border-color: var(--accent-border);
-  background: var(--accent-bg);
+.palette__item:hover {
+  border-color: var(--text);
 }
 
-.palette__card:active {
+.palette__item:active {
   cursor: grabbing;
 }
 
-.palette__thumb {
-  width: 48px;
-  height: 36px;
+.palette__icon {
   flex-shrink: 0;
-  object-fit: contain;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: #fff;
-}
-
-.palette__text {
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
+  font-size: 12px;
 }
 
 .palette__label {
-  color: var(--text-h);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.palette__description {
-  font-size: 11px;
-  color: var(--text);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

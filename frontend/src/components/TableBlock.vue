@@ -1,13 +1,9 @@
 <script setup>
-// A child-table field (e.g. Sales Invoice "items"), drawn as a table whose
-// columns come from the child DocType's "In List View" fields.
-
 import { computed, inject, ref } from 'vue'
 import { useCanvasNode } from '@/composables/useCanvasNode'
-import { getTableColumns, resolveLabel } from '@/utils/fieldResolver'
-import { propsToStyle } from '@/utils/htmlGenerator'
+import { resolveLabel, tableSettings } from '@/utils/fieldResolver'
+import { canvasStyle } from '@/utils/htmlGenerator'
 import NodeActions from './NodeActions.vue'
-import InlineEdit from './InlineEdit.vue'
 
 const props = defineProps({
   node: { type: Object, required: true },
@@ -16,28 +12,24 @@ const props = defineProps({
 })
 
 const { meta, getChildMeta } = inject('doctypeMeta', { meta: ref(null), getChildMeta: () => null })
-const { isSelected, select, onDragStart, moveBy, remove, updateProps } = useCanvasNode(
+const { isSelected, select, onDragStart, moveBy, remove } = useCanvasNode(
   () => props.node,
 )
 
-// `options` of a Table field is the child DocType's name.
-const columns = computed(() => getTableColumns(getChildMeta(props.node.options)))
+const settings = computed(() => tableSettings(props.node, getChildMeta(props.node.options)))
+const columns = computed(() => settings.value.columns)
+const totalLabel = computed(() => resolveLabel(settings.value.totalField, meta.value, getChildMeta))
 
-const defaultLabel = computed(
-  () => props.node.label || resolveLabel(props.node.fieldname, meta.value, getChildMeta),
-)
-const label = computed(() => props.node.props?.label || defaultLabel.value)
-
-function rename(value) {
-  updateProps({ label: value && value !== defaultLabel.value ? value : undefined })
-}
+const loopStart = computed(() => `{% for row in doc.${props.node.fieldname} %}`)
+const cell = (column) => `{{ row.${column.fieldname} }}`
+const totalCell = computed(() => `{{ doc.${settings.value.totalField} }}`)
 </script>
 
 <template>
   <div
     class="block"
     :class="{ 'is-selected': isSelected }"
-    :style="propsToStyle(node.props)"
+    :style="canvasStyle(node.props)"
     draggable="true"
     tabindex="0"
     @dragstart="onDragStart"
@@ -53,85 +45,119 @@ function rename(value) {
       @remove="remove"
     />
 
-    <div v-if="!node.props?.hideLabel" class="block__label">
-      <InlineEdit :value="label" placeholder="No label" @commit="rename" />
-    </div>
-
     <table v-if="columns.length" class="table">
-      <thead>
+      <colgroup>
+        <col v-for="column in columns" :key="column.fieldname" :style="column.width ? { width: `${column.width}%` } : null" />
+      </colgroup>
+      <thead v-if="settings.showHeader">
         <tr>
-          <th v-for="df in columns" :key="df.fieldname">{{ df.label || df.fieldname }}</th>
+          <th v-for="column in columns" :key="column.fieldname">{{ column.label }}</th>
         </tr>
       </thead>
       <tbody>
+        <tr class="table__loop">
+          <td :colspan="columns.length">{{ loopStart }}</td>
+        </tr>
         <tr>
-          <td v-for="df in columns" :key="df.fieldname" class="table__placeholder">
-            {{ df.fieldname }}
-          </td>
+          <td v-for="column in columns" :key="column.fieldname">{{ cell(column) }}</td>
+        </tr>
+        <tr class="table__loop">
+          <td :colspan="columns.length">{% endfor %}</td>
         </tr>
       </tbody>
+      <tfoot v-if="settings.showTotal && settings.totalField">
+        <tr class="table__total">
+          <td :colspan="columns.length">{{ totalLabel }}: {{ totalCell }}</td>
+        </tr>
+      </tfoot>
     </table>
     <p v-else class="table__missing">
-      Table <code>{{ node.fieldname }}</code> ({{ node.options || 'unknown DocType' }})
+      Table <code>{{ node.fieldname }}</code> → {{ node.options || 'unknown DocType' }}
+      (columns appear once its metadata is loaded)
     </p>
+
+    <span
+      v-if="node.props?.color"
+      class="block__swatch"
+      :style="{ background: node.props.color }"
+      :title="`Print color ${node.props.color}`"
+    />
   </div>
 </template>
 
 <style scoped>
 .block {
   position: relative;
-  padding: 4px 6px;
   border: 1px solid transparent;
   border-radius: 3px;
   cursor: grab;
 }
 
-.block:hover {
-  border-color: #d1d8dd;
+.block:hover:not(.is-selected) {
+  border-color: var(--muted);
 }
 
 .block.is-selected {
-  border-color: #7c3aed;
-  background: rgba(124, 58, 237, 0.05);
-}
-
-.block:focus-visible {
-  outline: 2px solid #7c3aed;
-  outline-offset: 1px;
-}
-
-.block__label {
-  color: #6c7680;
-  font-size: 11px;
-  margin-bottom: 2px;
+  border-color: var(--blue);
+  background: var(--blue-bg);
 }
 
 .table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: 11px;
 }
 
 .table th,
 .table td {
-  border: 1px solid #d1d8dd;
-  padding: 3px 6px;
-  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .table th {
-  background: #f4f5f6;
-  font-weight: 600;
+  padding: 4px 10px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--purple);
+  background: var(--purple-bg);
 }
 
-.table__placeholder {
-  color: #8d99a6;
+.table td {
+  padding: 4px 10px;
+  font-size: 10px;
+  color: var(--text);
+  background: var(--card);
+}
+
+.table__loop td {
   font-family: var(--mono);
+  font-size: 9px;
+  color: var(--muted);
+  background: none;
+}
+
+.table__total td {
+  text-align: right;
+  font-weight: 700;
+  color: var(--green);
+  background: none;
 }
 
 .table__missing {
-  margin: 0;
-  color: #8d99a6;
+  color: var(--muted);
   font-size: 11px;
+}
+
+.block__swatch {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--border);
 }
 </style>

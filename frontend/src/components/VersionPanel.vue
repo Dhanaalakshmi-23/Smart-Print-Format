@@ -1,30 +1,27 @@
 <script setup>
-// Version history of the open Smart Print Format (Smart Print Format
-// Version records, newest first). A version can be opened to preview its
-// layout, or restored as the working draft.
-//
-// Restoring copies the version's content into the Smart Print Format on the
-// server (restoreVersion), then reloads the document into the designer. The
-// version records themselves are never changed.
-//
-// Usage:
-//   <VersionPanel />
-
 import { computed, ref, watch } from 'vue'
 import { useSmartPrintStore } from '@/stores/smartPrintStore'
 import { getVersion, getVersions, restoreVersion } from '@/api/smartPrintApi'
+import { useDesigner } from '@/composables/useDesigner'
+import { useToast } from '@/composables/useToast'
+import { formatDateTime as formatDate } from '@/utils/format'
 import PreviewPanel from './PreviewPanel.vue'
 
+const props = defineProps({
+  name: { type: String, default: null },
+  inDesigner: { type: Boolean, default: false },
+})
+const emit = defineEmits(['restored'])
+
 const store = useSmartPrintStore()
-const spfName = computed(() => store.currentSPF?.name || null)
+const spfName = computed(() => props.name || store.currentSPF?.name || null)
+
+const isOpenInStore = computed(() => spfName.value === store.currentSPF?.name)
 
 const versions = ref([])
 const loading = ref(false)
 const error = ref(null)
 
-// ---- Loading the list ----
-
-// Guards against an older, slower request overwriting a newer one.
 let requestId = 0
 
 async function loadVersions() {
@@ -49,27 +46,12 @@ async function loadVersions() {
 
 watch(spfName, loadVersions, { immediate: true })
 
-// Publishing creates a version; pick it up once the publish succeeds.
-// Subscriptions made in setup() end when the component unmounts.
 store.$onAction(({ name, after }) => {
   if (name === 'publish') after(loadVersions)
 })
 
-// ---- Formatting ----
-
-// Frappe sends "2026-09-24 10:15:00.123456" in the site's timezone.
-function formatDate(value) {
-  if (!value) return ''
-  const date = new Date(value.replace(' ', 'T'))
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
-}
-
-// ---- Opening a version ----
-
 const dialog = ref(null)
-const opened = ref(null) // full version doc, layout_json parsed
+const opened = ref(null)
 const openingName = ref(null)
 
 async function open(version) {
@@ -91,31 +73,30 @@ function close() {
   dialog.value?.close()
 }
 
-// ---- Restoring ----
-
 const restoring = ref(false)
+const confirming = ref(null)
+const toast = useToast()
 
 async function restore(version) {
-  const unsaved = store.isDirty
-    ? '\n\nYou have unsaved changes. They will be lost.'
-    : ''
-  const ok = window.confirm(
-    `Restore version ${version.version_number}?\n\n` +
-      'Its layout replaces the current draft of this Smart Print Format. ' +
-      'The published print format does not change until you publish again.' +
-      unsaved,
-  )
-  if (!ok) return
-
   restoring.value = true
   error.value = null
   try {
-    await restoreVersion(version.name)
-    // Reload so the designer shows the restored layout. This also resets
-    // undo history: the server already holds the restored draft.
-    await store.load(spfName.value)
-    if (store.status === 'error') throw new Error(store.error)
+    if (props.inDesigner && isOpenInStore.value) {
+      const doc = await getVersion(version.name)
+      if (!doc.layout_json?.sections) throw new Error('its layout is missing or invalid.')
+      useDesigner().replaceLayout(doc.layout_json)
+      toast.success(`Version ${version.version_number} loaded — review it, then Save or Publish.`)
+    } else {
+      await restoreVersion(version.name)
+      if (isOpenInStore.value) {
+        await store.load(spfName.value)
+        if (store.status === 'error') throw new Error(store.error)
+      }
+      toast.success(`Version ${version.version_number} restored.`)
+    }
+    confirming.value = null
     close()
+    emit('restored', version)
   } catch (err) {
     error.value = `Could not restore version ${version.version_number}: ${err.message}`
   } finally {
@@ -167,7 +148,20 @@ const busy = computed(() => restoring.value || store.isBusy)
           <template v-if="version.created_by"> · {{ version.created_by }}</template>
         </p>
 
-        <div class="version__actions">
+        <div v-if="confirming === version.name" class="version__confirm" role="alert">
+          <p>
+            Restore v{{ version.version_number }}?
+            <template v-if="inDesigner">Its layout replaces the canvas (you can undo).</template>
+            <template v-else>The current layout is kept as a backup version.</template>
+          </p>
+          <div class="version__actions">
+            <button type="button" class="is-primary" :disabled="busy" @click="restore(version)">
+              {{ restoring ? 'Restoring…' : 'Confirm restore' }}
+            </button>
+            <button type="button" :disabled="restoring" @click="confirming = null">Cancel</button>
+          </div>
+        </div>
+        <div v-else class="version__actions">
           <button
             type="button"
             :disabled="openingName === version.name"
@@ -175,12 +169,11 @@ const busy = computed(() => restoring.value || store.isBusy)
           >
             {{ openingName === version.name ? 'Opening…' : 'Open' }}
           </button>
-          <button type="button" :disabled="busy" @click="restore(version)">Restore</button>
+          <button type="button" :disabled="busy" @click="confirming = version.name">Restore</button>
         </div>
       </li>
     </ul>
 
-    <!-- Read-only look at a version before restoring it. -->
     <dialog ref="dialog" class="versions__dialog" @close="opened = null">
       <template v-if="opened">
         <header class="versions__dialog-bar">
@@ -188,12 +181,18 @@ const busy = computed(() => restoring.value || store.isBusy)
             Version {{ opened.version_number }}
             <small>{{ formatDate(opened.created_on) }}</small>
           </h3>
-          <button type="button" :disabled="busy" @click="restore(opened)">
-            {{ restoring ? 'Restoring…' : 'Restore this version' }}
+          <template v-if="confirming === opened.name">
+            <span class="versions__dialog-ask">Restore v{{ opened.version_number }}?</span>
+            <button type="button" class="is-primary" :disabled="busy" @click="restore(opened)">
+              {{ restoring ? 'Restoring…' : 'Confirm restore' }}
+            </button>
+            <button type="button" :disabled="restoring" @click="confirming = null">Cancel</button>
+          </template>
+          <button v-else type="button" :disabled="busy" @click="confirming = opened.name">
+            Restore this version
           </button>
           <button type="button" @click="close">Close</button>
         </header>
-        <!-- The sidebar's error is hidden behind the modal, so repeat it here. -->
         <p v-if="error" class="versions__dialog-summary versions__message is-error" role="alert">
           {{ error }}
         </p>
@@ -229,16 +228,16 @@ const busy = computed(() => restoring.value || store.isBusy)
 
 .versions__message {
   margin: 0;
-  color: var(--text);
+  color: var(--muted);
 }
 
 .versions__message.is-error {
-  color: #d9383a;
+  color: var(--red);
 }
 
 button {
   font: inherit;
-  color: var(--text-h);
+  color: var(--text);
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -247,8 +246,8 @@ button {
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--accent-border);
-  background: var(--accent-bg);
+  border-color: var(--blue);
+  background: var(--blue-bg);
 }
 
 button:disabled {
@@ -283,37 +282,60 @@ button:disabled {
 
 .version__number {
   font-weight: 600;
-  color: var(--text-h);
+  color: var(--text);
 }
 
 .version__badge {
   padding: 0 6px;
   border-radius: 999px;
   font-size: 11px;
-  background: var(--code-bg);
+  background: var(--input);
 }
 
 .version__badge.is-published {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--green-bg);
+  color: var(--green);
 }
 
 .version__summary {
   margin: 0;
-  color: var(--text-h);
+  color: var(--text);
   overflow-wrap: anywhere;
 }
 
 .version__meta {
   margin: 0;
   font-size: 11px;
-  color: var(--text);
+  color: var(--muted);
   overflow-wrap: anywhere;
 }
 
 .version__actions {
   display: flex;
   gap: 6px;
+}
+
+.version__confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 8px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--blue-bg);
+  border: 1px solid var(--blue);
+  border-radius: var(--radius-card);
+}
+
+button.is-primary {
+  color: var(--blue-soft);
+  background: var(--blue-bg);
+  border-color: var(--blue);
+}
+
+.versions__dialog-ask {
+  font-size: 12px;
+  color: var(--text);
 }
 
 .versions__dialog {
@@ -323,7 +345,7 @@ button:disabled {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--bg);
-  color: var(--text);
+  color: var(--muted);
 }
 
 .versions__dialog::backdrop {
@@ -346,13 +368,13 @@ button:disabled {
   flex: 1;
   margin: 0;
   font-size: 14px;
-  color: var(--text-h);
+  color: var(--text);
 }
 
 .versions__dialog-bar small {
   margin-left: 6px;
   font-weight: normal;
-  color: var(--text);
+  color: var(--muted);
 }
 
 .versions__dialog-summary {

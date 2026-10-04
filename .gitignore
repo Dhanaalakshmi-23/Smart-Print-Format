@@ -53,3 +53,9 @@ jspm_packages/
 
 # Aider AI Chat
 .aider*
+
+# Built designer frontend (cd frontend && npm run build)
+smart_print_format/public/frontend/
+
+# Vite dependency cache
+.vite/

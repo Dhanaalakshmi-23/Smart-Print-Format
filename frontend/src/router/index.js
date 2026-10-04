@@ -1,16 +1,36 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import Home from '@/views/Home.vue'
+import SmartPrintDashboard from '@/views/SmartPrintDashboard.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'home',
-    component: Home,
+    name: 'new',
+    component: () => import('@/views/SmartPrintDesigner.vue'),
   },
+
+  {
+    path: '/dashboard',
+    name: 'dashboard',
+    component: SmartPrintDashboard,
+  },
+  {
+    path: '/designer/:name',
+    name: 'designer',
+    component: () => import('@/views/SmartPrintDesigner.vue'),
+    props: true,
+  },
+  {
+    path: '/versions/:name',
+    name: 'versions',
+    component: () => import('@/views/SmartPrintVersions.vue'),
+    props: true,
+  },
+
+  { path: '/:pathMatch(.*)*', redirect: '/' },
 ]
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory('/smart-print'),
   routes,
 })
 

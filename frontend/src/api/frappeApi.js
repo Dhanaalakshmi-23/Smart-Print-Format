@@ -1,7 +1,3 @@
-// Common wrapper for talking to the Frappe backend.
-// Every other API module goes through the helpers exported here, so CSRF
-// handling, response unwrapping and error parsing live in one place.
-
 const BASE_URL = '/api'
 
 export class FrappeApiError extends Error {
@@ -15,13 +11,27 @@ export class FrappeApiError extends Error {
   }
 }
 
-function getCsrfToken() {
+const CSRF_METHOD = 'smart_print_format.api.get_csrf_token'
+let fetchedCsrfToken = null
+
+function pageCsrfToken() {
   const token = window.frappe?.csrf_token || window.csrf_token || ''
-  // Frappe renders the literal string "None" for guest sessions.
+
   return token === 'None' ? '' : token
 }
 
-// Query-string values must be strings; Frappe expects lists/objects as JSON.
+async function getCsrfToken({ refresh = false } = {}) {
+  const fromPage = pageCsrfToken()
+  if (fromPage && !refresh) return fromPage
+
+  if (!fetchedCsrfToken || refresh) {
+    fetchedCsrfToken = request('GET', `/method/${CSRF_METHOD}`)
+      .then((body) => body.message || '')
+      .catch(() => '')
+  }
+  return fetchedCsrfToken
+}
+
 function toQueryValue(value) {
   return typeof value === 'object' ? JSON.stringify(value) : String(value)
 }
@@ -36,8 +46,6 @@ function buildUrl(path, params) {
   return url
 }
 
-// `_server_messages` is a JSON string holding a list of JSON strings,
-// each one a { message, title, indicator } object from frappe.msgprint/throw.
 function parseServerMessages(raw) {
   if (!raw) return []
   try {
@@ -63,8 +71,6 @@ async function parseBody(response) {
   }
 }
 
-// Frappe messages often contain markup like "<strong>Guest</strong>";
-// the UI shows errors as plain text, so keep only the text.
 function stripHtml(value) {
   const html = String(value ?? '')
   if (typeof DOMParser === 'undefined') return html.replace(/<[^>]*>/g, '')
@@ -88,11 +94,11 @@ function toApiError(response, body) {
   })
 }
 
-export async function request(method, path, { params, data } = {}) {
+export async function request(method, path, { params, data, retryCsrf = true } = {}) {
   const headers = { Accept: 'application/json' }
   if (method !== 'GET') {
     headers['Content-Type'] = 'application/json'
-    headers['X-Frappe-CSRF-Token'] = getCsrfToken()
+    headers['X-Frappe-CSRF-Token'] = await getCsrfToken()
   }
 
   let response
@@ -109,12 +115,14 @@ export async function request(method, path, { params, data } = {}) {
 
   const body = await parseBody(response)
   if (!response.ok) {
+    if (body.exc_type === 'CSRFTokenError' && retryCsrf) {
+      await getCsrfToken({ refresh: true })
+      return request(method, path, { params, data, retryCsrf: false })
+    }
     throw toApiError(response, body)
   }
   return body
 }
-
-// ---- Whitelisted methods: /api/method/<dotted.path> -> { message } ----
 
 export async function callMethod(method, args = {}, { httpMethod = 'POST' } = {}) {
   const body =
@@ -126,8 +134,6 @@ export async function callMethod(method, args = {}, { httpMethod = 'POST' } = {}
 
 export const getMethod = (method, args) => callMethod(method, args, { httpMethod: 'GET' })
 export const postMethod = (method, args) => callMethod(method, args, { httpMethod: 'POST' })
-
-// ---- Document REST API: /api/resource/<DocType>[/<name>] -> { data } ----
 
 const resourcePath = (doctype, name) =>
   name
@@ -143,7 +149,7 @@ export async function getList(
       fields,
       filters,
       order_by: orderBy,
-      limit_page_length: limit, // 0 = no limit
+      limit_page_length: limit,
       limit_start: start,
     },
   })
@@ -153,30 +159,4 @@ export async function getList(
 export async function getDoc(doctype, name) {
   const body = await request('GET', resourcePath(doctype, name))
   return body.data
-}
-
-export async function insertDoc(doctype, values) {
-  const body = await request('POST', resourcePath(doctype), { data: values })
-  return body.data
-}
-
-export async function updateDoc(doctype, name, values) {
-  const body = await request('PUT', resourcePath(doctype, name), { data: values })
-  return body.data
-}
-
-export async function deleteDoc(doctype, name) {
-  await request('DELETE', resourcePath(doctype, name))
-}
-
-export default {
-  request,
-  callMethod,
-  getMethod,
-  postMethod,
-  getList,
-  getDoc,
-  insertDoc,
-  updateDoc,
-  deleteDoc,
 }

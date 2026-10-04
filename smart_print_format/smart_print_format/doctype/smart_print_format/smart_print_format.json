@@ -39,12 +39,12 @@
    "reqd": 1
   },
   {
+   "description": "Created on first publish when left empty.",
    "fieldname": "print_format",
    "fieldtype": "Link",
    "in_list_view": 1,
    "label": "Print Format",
-   "options": "Print Format",
-   "reqd": 1
+   "options": "Print Format"
   },
   {
    "default": "Draft",
@@ -69,13 +69,15 @@
   },
   {
    "fieldname": "generated_html",
-   "fieldtype": "Long Text",
-   "label": "Generated HTML"
+   "fieldtype": "Code",
+   "label": "Generated HTML",
+   "options": "Jinja"
   },
   {
    "fieldname": "generated_css",
-   "fieldtype": "Long Text",
-   "label": "Generated CSS"
+   "fieldtype": "Code",
+   "label": "Generated CSS",
+   "options": "CSS"
   },
   {
    "fieldname": "description",
@@ -113,7 +115,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-21 13:04:55.783260",
+ "modified": "2026-09-25 10:50:36.516893",
  "modified_by": "Administrator",
  "module": "Smart Print Format",
  "name": "Smart Print Format",
@@ -129,6 +131,18 @@
    "read": 1,
    "report": 1,
    "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Smart Print Manager",
    "share": 1,
    "write": 1
   }

@@ -37,19 +37,21 @@
   },
   {
    "fieldname": "layout_json",
-   "fieldtype": "Long Text",
+   "fieldtype": "JSON",
    "label": "Layout JSON",
    "reqd": 1
   },
   {
    "fieldname": "generated_html",
-   "fieldtype": "Long Text",
-   "label": "Generated HTML"
+   "fieldtype": "Code",
+   "label": "Generated HTML",
+   "options": "Jinja"
   },
   {
    "fieldname": "generated_css",
-   "fieldtype": "Long Text",
-   "label": "Generated CSS"
+   "fieldtype": "Code",
+   "label": "Generated CSS",
+   "options": "CSS"
   },
   {
    "fieldname": "created_by",
@@ -91,7 +93,7 @@
  "grid_page_length": 50,
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-21 12:14:08.412890",
+ "modified": "2026-09-25 10:50:36.516893",
  "modified_by": "Administrator",
  "module": "Smart Print Format",
  "name": "Smart Print Format Version",
@@ -100,15 +102,19 @@
  "permissions": [
   {
    "create": 1,
-   "delete": 1,
-   "email": 1,
    "export": 1,
    "print": 1,
    "read": 1,
    "report": 1,
-   "role": "System Manager",
-   "share": 1,
-   "write": 1
+   "role": "System Manager"
+  },
+  {
+   "create": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Smart Print Manager"
   }
  ],
  "row_format": "Dynamic",

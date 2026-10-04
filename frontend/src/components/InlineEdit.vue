@@ -1,7 +1,4 @@
 <script setup>
-// Text that turns into an input on double-click. Emits `commit` with the new
-// value on Enter or blur; Esc cancels.
-
 import { nextTick, ref } from 'vue'
 
 const props = defineProps({
@@ -18,7 +15,7 @@ const input = ref(null)
 async function start() {
   draft.value = props.value
   editing.value = true
-  await nextTick() // wait for the <input> to exist
+  await nextTick()
   input.value?.select()
 }
 
@@ -62,7 +59,7 @@ function cancel() {
 }
 
 .inline-edit.is-empty {
-  color: #8d99a6;
+  color: var(--muted);
   font-style: italic;
 }
 
@@ -72,8 +69,8 @@ function cancel() {
   width: 100%;
   box-sizing: border-box;
   padding: 0 2px;
-  border: 1px solid #7c3aed;
+  border: 1px solid var(--blue);
   border-radius: 3px;
-  background: #fff;
+  background: var(--bg);
 }
 </style>

@@ -1,0 +1,37 @@
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 400; font-display: swap; src: url('/assets/frappe/css/fonts/inter/Inter-Regular.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 500; font-display: swap; src: url('/assets/frappe/css/fonts/inter/Inter-Medium.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 600; font-display: swap; src: url('/assets/frappe/css/fonts/inter/Inter-SemiBold.woff2') format('woff2'); }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 700; font-display: swap; src: url('/assets/frappe/css/fonts/inter/Inter-Bold.woff2') format('woff2'); }
+
+/* Frappe's standard (light desk) colors. */
+:root {
+  --bg: #f3f3f3;
+  --panel: #ffffff;
+  --card: #f8f8f8;
+  --input: #f3f3f3;
+  --paper: #ffffff;
+  --border: #e2e2e2;
+
+  --text: #171717;
+  --muted: #7c7c7c;
+
+  --blue: #0289f7;
+  --blue-soft: #007be0;
+  --blue-bg: #e6f4ff;
+  --green: #278f5e;
+  --green-bg: #e4faeb;
+  --purple: #6846e3;
+  --purple-bg: #f0ebff;
+  --orange: #db7706;
+  --orange-bg: #fff7d3;
+  --red: #cc2929;
+  --red-bg: #fff0f0;
+
+  --shadow: rgba(0, 0, 0, 0.12) 0 8px 24px;
+
+  --radius-panel: 8px;
+  --radius-card: 5px;
+
+  --sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'Cascadia Code', Consolas, monospace;
+}

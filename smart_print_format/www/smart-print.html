@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="{{ boot.boot.lang }}" style="background: #f3f3f3">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>Smart Print Format Designer</title>
+		{% if assets %}
+		<link rel="icon" type="image/svg+xml" href="{{ assets.favicon }}" />
+		{% for href in assets.css %}
+		<link rel="stylesheet" crossorigin href="{{ href }}" />
+		{% endfor %}
+		{% for href in assets.preloads %}
+		<link rel="modulepreload" crossorigin href="{{ href }}" />
+		{% endfor %}
+		{% endif %}
+	</head>
+	<body>
+		<div id="app"></div>
+		<script>
+			window.csrf_token = {{ boot.csrf_token | tojson }};
+			window.spf_boot = {{ boot.boot | tojson }};
+		</script>
+		{% if assets %}
+		<script type="module" crossorigin src="{{ assets.script }}"></script>
+		{% else %}
+		<p style="color: #171717; font-family: sans-serif; padding: 24px">
+			The Smart Print Format frontend has not been built yet. Run
+			<code>cd apps/smart_print_format/frontend &amp;&amp; npm install &amp;&amp; npm run build</code>.
+		</p>
+		{% endif %}
+	</body>
+</html>

@@ -1,10 +1,3 @@
-// Look up field information in DocType metadata.
-//
-// `meta` is a DocType meta (useDoctypeMeta().meta.value) and `getChildMeta`
-// is useDoctypeMeta().getChildMeta, used for child-table paths like
-// "items.item_code".
-
-// Fields every document has, which aren't listed in meta.fields.
 export const STANDARD_FIELDS = [
   { fieldname: 'name', label: 'ID', fieldtype: 'Data' },
   { fieldname: 'owner', label: 'Created By', fieldtype: 'Link', options: 'User' },
@@ -19,7 +12,6 @@ export const TABLE_FIELDTYPES = ['Table', 'Table MultiSelect']
 
 export const isTableField = (docfield) => TABLE_FIELDTYPES.includes(docfield?.fieldtype)
 
-// "customer_name" -> "Customer Name"
 export function labelFromFieldname(fieldname = '') {
   return fieldname.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 }
@@ -32,12 +24,6 @@ function findDocfield(meta, fieldname) {
   )
 }
 
-// Resolve "customer" or "items.item_code" to its docfield.
-// Returns null if the field (or its table) doesn't exist.
-//
-//   { path, fieldname, label, fieldtype, options, table, docfield }
-//
-// `table` is the parent table fieldname for child-table paths, else null.
 export function resolveField(path, meta, getChildMeta) {
   if (!path || !meta) return null
 
@@ -68,18 +54,47 @@ function splitPath(path) {
   return dot === -1 ? [path, null] : [path.slice(0, dot), path.slice(dot + 1)]
 }
 
-// Label for a path, falling back to a readable version of the fieldname
-// when the field isn't in the metadata.
 export function resolveLabel(path, meta, getChildMeta) {
   return resolveField(path, meta, getChildMeta)?.label || labelFromFieldname(path?.split('.').pop())
 }
 
-// Columns to show for a child table: the fields marked "In List View",
-// or the first few value fields if none are marked.
 export function getTableColumns(childMeta, { max = 5 } = {}) {
   const fields = (childMeta?.fields || []).filter(
-    (df) => !['Section Break', 'Column Break', 'Tab Break', 'Button'].includes(df.fieldtype),
+    (df) =>
+      !['Section Break', 'Column Break', 'Tab Break', 'Button', ...TABLE_FIELDTYPES].includes(df.fieldtype) &&
+      !df.print_hide,
   )
   const listView = fields.filter((df) => df.in_list_view)
-  return (listView.length ? listView : fields).slice(0, max)
+  return listView.length ? listView : fields.slice(0, max)
 }
+
+export function tableSettings(node, childMeta) {
+  const props = node?.props || {}
+  const configured = props.columns?.length ? props.columns : node?.table?.columns
+  const columns = configured?.length
+    ? configured.map((column) => {
+        const df = findDocfield(childMeta, column.fieldname)
+        return {
+          fieldname: column.fieldname,
+          label: column.label || df?.label || labelFromFieldname(column.fieldname),
+          width: column.width ?? null,
+          df,
+        }
+      })
+    : getTableColumns(childMeta).map((df) => ({
+        fieldname: df.fieldname,
+        label: df.label || labelFromFieldname(df.fieldname),
+        width: null,
+        df,
+      }))
+  return {
+    columns,
+    configured: Boolean(configured?.length),
+    showHeader: props.showHeader !== false,
+    showTotal: Boolean(props.showTotal),
+    totalField: props.totalField || null,
+  }
+}
+
+export const columnWidthTotal = (columns = []) =>
+  columns.reduce((sum, column) => sum + (Number(column.width) || 0), 0)

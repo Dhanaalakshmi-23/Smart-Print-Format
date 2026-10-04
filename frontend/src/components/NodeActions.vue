@@ -1,12 +1,10 @@
 <script setup>
-// Small action bar shown on the selected canvas block: move and delete.
-// Buttons are the keyboard-friendly alternative to drag-and-drop.
-
 defineProps({
-  label: { type: String, required: true }, // 'field', 'column', ...
+  label: { type: String, required: true },
   index: { type: Number, required: true },
   count: { type: Number, required: true },
-  axis: { type: String, default: 'y' }, // 'x' for side-by-side columns
+  axis: { type: String, default: 'y' },
+  movable: { type: Boolean, default: true },
 })
 
 defineEmits(['move', 'remove'])
@@ -16,6 +14,7 @@ defineEmits(['move', 'remove'])
   <div class="node-actions" @click.stop>
     <span class="node-actions__label">{{ label }}</span>
     <button
+      v-if="movable"
       type="button"
       :disabled="index === 0"
       :aria-label="`Move ${label} ${axis === 'y' ? 'up' : 'left'}`"
@@ -24,6 +23,7 @@ defineEmits(['move', 'remove'])
       {{ axis === 'y' ? '↑' : '←' }}
     </button>
     <button
+      v-if="movable"
       type="button"
       :disabled="index >= count - 1"
       :aria-label="`Move ${label} ${axis === 'y' ? 'down' : 'right'}`"
@@ -53,9 +53,15 @@ defineEmits(['move', 'remove'])
   gap: 2px;
   padding: 2px 4px;
   border-radius: 4px 4px 0 0;
-  background: #7c3aed;
+  background: var(--blue);
   color: #fff;
   font: 11px/1.4 var(--sans);
+  visibility: hidden;
+}
+
+:hover > .node-actions,
+:focus-within > .node-actions {
+  visibility: visible;
 }
 
 .node-actions__label {
@@ -83,6 +89,6 @@ button:disabled {
 }
 
 .node-actions__delete:hover {
-  background: #d9383a !important;
+  background: var(--red) !important;
 }
 </style>

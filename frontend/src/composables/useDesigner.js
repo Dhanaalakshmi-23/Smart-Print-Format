@@ -1,10 +1,12 @@
-// All components share one designer instance, so the canvas, the field
-// picker and the toolbar see the same history and selection.
-
-import { computed, effectScope } from 'vue'
+import { computed, effectScope, ref, watch } from 'vue'
 import { useSmartPrintStore } from '@/stores/smartPrintStore'
 import { useHistory } from '@/composables/useHistory'
+import { useDoctypeMeta } from '@/composables/useDoctypeMeta'
+import { useToast } from '@/composables/useToast'
+import { validateLayoutOnServer } from '@/api/smartPrintApi'
+import { locateNode, validateLayout } from '@/utils/validation'
 import {
+  bodyRange,
   cloneLayout,
   createColumn,
   createComponentNode,
@@ -12,6 +14,7 @@ import {
   createSection,
   findNode,
   findParent,
+  findSectionByKind,
   insertNode,
   removeNode,
 } from '@/utils/layout'
@@ -23,16 +26,14 @@ function createDesigner() {
   const layoutState = computed(() => store.layoutJson)
   const selectedNode = computed(() => store.selectedNodeData)
 
-  // Start a clean history whenever a different document is opened.
   history.reset(store.layoutJson)
   store.$onAction(({ name, after }) => {
     if (name === 'load' || name === 'newSPF') {
       after(() => history.reset(store.layoutJson))
     }
-  }, true) // `true`: keep listening even after the calling component unmounts
+  }, true)
 
-  // Run `mutate` on a copy of the layout, then store it and record it.
-  // Working on a copy means a failing operation leaves the layout untouched.
+  // Edits run on a copy, so a failing operation leaves the layout untouched.
   function commit(mutate) {
     const draft = cloneLayout(store.layoutJson)
     const result = mutate(draft)
@@ -41,14 +42,21 @@ function createDesigner() {
     return result
   }
 
-  // ---- Layout operations ----
-
-  // Returns the new section's id.
-  function addSection({ label = '', columns = 1, index } = {}) {
-    return commit((layout) => insertNode(layout, createSection({ label, columns }), index).id)
+  function addSection({ label = '', columns = 1, index, kind } = {}) {
+    if (kind && findSectionByKind(store.layoutJson, kind)) {
+      return findSectionByKind(store.layoutJson, kind).id
+    }
+    return commit((layout) => placeSection(layout, createSection({ label, columns, kind }), index).id)
   }
 
-  // Returns the new column's id.
+  function placeSection(layout, section, index) {
+    if (section.kind === 'header') return insertNode(layout, section, 0)
+    if (section.kind === 'footer') return insertNode(layout, section)
+    const { start, end } = bodyRange(layout)
+    const at = index == null ? end : Math.min(start + Math.max(index, 0), end)
+    return insertNode(layout, section, at)
+  }
+
   function addColumn(sectionId, { index } = {}) {
     return commit((layout) => {
       const section = findNode(layout, sectionId)
@@ -57,31 +65,33 @@ function createDesigner() {
     })
   }
 
-  // `node` is a DocType field (e.g. from useDoctypeMeta().fields).
-  // Without a columnId the field goes into the selected column, the column of
-  // the selected field, or the last column, creating a section if needed.
-  // Returns the new field's id.
-  function addField(node, { columnId, index } = {}) {
-    return addToColumn(createField(node), { columnId, index })
+  function addField(node, placement = {}) {
+    return addToColumn(createField(node), placement)
   }
 
-  // `component` is a Smart Print Format Component (from ComponentPalette).
-  // Placement works like addField. Returns the new node's id.
-  function addComponent(component, { columnId, index } = {}) {
-    return addToColumn(createComponentNode(component), { columnId, index })
+  function addComponent(component, placement = {}) {
+    return addToColumn(createComponentNode(component), placement)
   }
 
-  function addToColumn(newNode, { columnId, index }) {
+  function addToColumn(newNode, { columnId, index, newSection } = {}) {
     return commit((layout) => {
-      const column = columnId ? findNode(layout, columnId) : defaultColumn(layout)
+      let column
+      if (columnId) {
+        column = findNode(layout, columnId)
+      } else if (newSection) {
+        const section =
+          (newSection.kind && findSectionByKind(layout, newSection.kind)) ||
+          placeSection(layout, createSection({ kind: newSection.kind }), newSection.index)
+        column = section.columns[0]
+      } else {
+        column = defaultColumn(layout)
+      }
       if (!column) throw new Error(`Column '${columnId}' not found.`)
       return insertNode(column, newNode, index).id
     })
   }
 
-  // Move a node to `targetId` (a section/column id, or null for the layout
-  // root when moving sections) at `index`. The index counts positions after
-  // the node has been taken out, which is what drag-and-drop libraries report.
+  // `index` counts positions after the node is taken out (as drag-and-drop reports it).
   function moveNode(id, targetId, index) {
     commit((layout) => {
       const target = targetId ? findNode(layout, targetId) : layout
@@ -89,30 +99,42 @@ function createDesigner() {
       if (findNode(findNode(layout, id), targetId)) {
         throw new Error('A node cannot be moved inside itself.')
       }
+      if (findNode(layout, id)?.kind) throw new Error('The header and footer cannot be moved.')
       const node = removeNode(layout, id)
       if (!node) throw new Error(`Node '${id}' not found.`)
+      if (node.type === 'section') {
+        const { start, end } = bodyRange(layout)
+        index = Math.min(Math.max(index ?? end, start), end)
+      }
       insertNode(target, node, index)
     })
   }
 
-  // Move a node one position up/left (-1) or down/right (+1) among its siblings.
   function moveNodeBy(id, delta) {
     const location = findParent(store.layoutJson, id)
-    if (!location) return
+    const node = location?.list[location.index]
+    if (!node || node.kind) return
     const index = location.index + delta
-    if (index < 0 || index >= location.list.length) return
+    const [min, max] =
+      node.type === 'section'
+        ? ((r) => [r.start, r.end - 1])(bodyRange(store.layoutJson))
+        : [0, location.list.length - 1]
+    if (index < min || index > max) return
     moveNode(id, location.parent.id ?? null, index)
+  }
+
+  function replaceLayout(layout) {
+    const next = cloneLayout(layout)
+    store.setLayout(next)
+    history.push(next)
   }
 
   function deleteNode(id) {
     commit((layout) => {
       if (!removeNode(layout, id)) throw new Error(`Node '${id}' not found.`)
     })
-    // store.setLayout already clears the selection if the selected node
-    // (or its parent) was removed.
   }
 
-  // Merge `props` into the node's props (styling, visibility, ...).
   function updateProps(id, props) {
     commit((layout) => {
       const node = findNode(layout, id)
@@ -120,8 +142,6 @@ function createDesigner() {
       node.props = { ...node.props, ...props }
     })
   }
-
-  // ---- Selection ----
 
   function selectNode(id) {
     store.selectNode(id)
@@ -133,12 +153,119 @@ function createDesigner() {
     if (selected?.type === 'column') return selected
     if (selected?.type === 'field' || selected?.type === 'component') return findParent(layout, selectedId).parent
 
-    let section = layout.sections.at(-1)
-    if (!section) section = insertNode(layout, createSection())
+    const { start, end } = bodyRange(layout)
+    const section = end > start ? layout.sections[end - 1] : placeSection(layout, createSection())
     return section.columns.at(-1) || insertNode(section, createColumn())
   }
 
-  // ---- Undo / redo ----
+  const toast = useToast()
+  const { meta, getChildMeta } = useDoctypeMeta(() => store.targetDoctype)
+
+  const validation = ref(null)
+  const validating = ref(false)
+
+  const invalidIds = computed(
+    () => new Set((validation.value?.errors || []).map((issue) => issue.nodeId).filter(Boolean)),
+  )
+
+  watch(
+    () => store.layoutJson,
+    () => (validation.value = null),
+  )
+
+  const fromServer = (layout) => (issue) => ({
+    level: issue.severity === 'warning' ? 'warning' : 'error',
+    nodeId: issue.node_id || null,
+    location: locateNode(layout, issue.node_id) || 'Layout',
+    message: issue.message,
+  })
+
+  async function validate() {
+    const layout = store.layoutJson
+    const local = validateLayout(layout, { meta: meta.value, getChildMeta })
+
+    if (!store.targetDoctype) {
+      const result = {
+        ...local,
+        valid: false,
+        errors: [
+          { level: 'error', nodeId: null, location: 'Layout', message: 'Select a DocType first.' },
+          ...local.errors,
+        ],
+        source: 'local',
+      }
+      validation.value = result
+      return result
+    }
+
+    validating.value = true
+    try {
+      const response = await validateLayoutOnServer({
+        name: store.currentSPF?.name,
+        layout,
+        targetDoctype: store.targetDoctype,
+      })
+      const map = fromServer(layout)
+      const result = {
+        valid: Boolean(response.valid),
+        errors: (response.errors || []).map(map),
+        warnings: (response.warnings || []).map(map),
+        source: 'server',
+      }
+
+      if (store.layoutJson === layout) validation.value = result
+      return result
+    } catch (err) {
+      const result = {
+        ...local,
+        valid: false,
+        errors: [
+          {
+            level: 'error',
+            nodeId: null,
+            location: 'Server',
+            message: `Could not validate on the server: ${err.message}`,
+          },
+          ...local.errors,
+        ],
+        source: 'local',
+      }
+      validation.value = result
+      return result
+    } finally {
+      validating.value = false
+    }
+  }
+
+  const isWorking = computed(() => validating.value || store.isBusy)
+
+  async function save() {
+    if (isWorking.value) return false
+    const result = await validate()
+    if (!result.valid) return false
+    await store.save()
+    if (store.status === 'error') {
+      toast.error(`Could not save: ${store.error}`)
+      return false
+    }
+    validation.value = null
+    const version = store.currentSPF?.version
+    toast.success(version ? `Saved · version ${version}` : 'Saved')
+    return true
+  }
+
+  const publishDialogOpen = ref(false)
+  const openPublish = () => (publishDialogOpen.value = true)
+
+  async function publish(changeSummary = '') {
+    if (isWorking.value) return { ok: false, error: 'Busy, try again in a moment.' }
+    const result = await validate()
+    if (!result.valid) return { ok: false, validation: result }
+    await store.publish({ changeSummary })
+    if (store.status === 'error') return { ok: false, error: store.error }
+    validation.value = null
+    return { ok: true }
+  }
 
   function undo() {
     const snapshot = history.undo()
@@ -161,16 +288,25 @@ function createDesigner() {
     moveNode,
     moveNodeBy,
     deleteNode,
+    replaceLayout,
     updateProps,
     undo,
     redo,
     canUndo: history.canUndo,
     canRedo: history.canRedo,
+    validation,
+    validating,
+    invalidIds,
+    isWorking,
+    validate,
+    save,
+    publish,
+    publishDialogOpen,
+    openPublish,
   }
 }
 
-// One shared instance. It runs in a detached effect scope so its computed
-// values keep working even after the component that first called it unmounts.
+// One shared instance for all components, in a detached scope so it outlives them.
 let designer = null
 
 export function useDesigner() {
